@@ -97,6 +97,7 @@ from .util import (
     parse_cli_args,
     save_account_progress,
     scroll_down,
+    scroll_top,
     truncate_float,
     validate_username,
     web_address_navigator,
@@ -5902,6 +5903,47 @@ class InstaPy:
                 scroll_down(self.browser)
 
         self.logger.info("Accepted {} follow requests".format(accepted))
+
+        return self
+
+    def delete_follow_requests(self, amount: int = 100, sleep_delay: int = 1):
+        """Delete pending follow requests from activity feed"""
+
+        if self.aborting:
+            return self
+
+        message = "Starting to get follow requests.."
+        highlight_print(self.username, message, "feature", "info", self.logger)
+
+        deleted = 0
+        while deleted < amount:
+
+            feed_link = "https://www.instagram.com/accounts/activity/?followRequests=1"
+            web_address_navigator(self.browser, feed_link)
+
+            requests_to_delete = self.browser.find_elements(
+                By.XPATH, "//button[text()='Delete']"
+            )
+
+            if len(requests_to_delete) == 0:
+                self.logger.info("There are no follow requests in activity feed")
+                break
+
+            for request in requests_to_delete:
+                # click_visible(self.browser,request)
+                request.click()
+                sleep(sleep_delay)
+                deleted += 1
+                if deleted >= amount:
+                    self.logger.info(
+                        "Reached deleted accounts limit of {} requests".format(amount)
+                    )
+                    break
+                # catch if the list cannot be accessed, there are more followers under the hood or
+                # because another element <a class="gKAyB " href="/accounts/activity/"> obscures it...
+                scroll_top(self.browser,requests,50)
+
+        self.logger.info("Deleted {} follow requests".format(deleted))
 
         return self
 

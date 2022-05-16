@@ -1,10 +1,10 @@
 """Module only used for the login part of the script"""
 # import built-in & third-party modules
-import json
-import os
 import pickle
-import random
 import socket
+import os
+import json
+import random
 
 # import exceptions
 from selenium.common.exceptions import (
@@ -26,7 +26,18 @@ from .util import (
     update_activity,
     web_address_navigator,
 )
+from .util import update_activity
+from .util import web_address_navigator
+from .util import explicit_wait
+from .util import click_element
+from .util import check_authorization
+from .util import reload_webpage
 from .xpath import read_xpath
+
+# import exceptions
+from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import WebDriverException
+from selenium.common.exceptions import MoveTargetOutOfBoundsException
 
 
 def bypass_suspicious_login(
@@ -42,9 +53,8 @@ def bypass_suspicious_login(
     option = None
     if bypass_security_challenge_using == "sms":
         try:
-            option = browser.find_element(
-                By.XPATH,
-                read_xpath(bypass_suspicious_login.__name__, "bypass_with_sms_option"),
+            option = browser.find_element_by_xpath(
+                read_xpath(bypass_suspicious_login.__name__, "bypass_with_sms_option")
             )
         except NoSuchElementException:
             logger.warning(
@@ -55,11 +65,8 @@ def bypass_suspicious_login(
 
     if bypass_security_challenge_using == "email":
         try:
-            option = browser.find_element(
-                By.XPATH,
-                read_xpath(
-                    bypass_suspicious_login.__name__, "bypass_with_email_option"
-                ),
+            option = browser.find_element_by_xpath(
+                read_xpath(bypass_suspicious_login.__name__, "bypass_with_email_option")
             )
         except NoSuchElementException:
             logger.warning(
@@ -74,9 +81,8 @@ def bypass_suspicious_login(
     option_text = option.text
 
     # click on security code
-    send_security_code_button = browser.find_element(
-        By.XPATH,
-        read_xpath(bypass_suspicious_login.__name__, "send_security_code_button"),
+    send_security_code_button = browser.find_element_by_xpath(
+        read_xpath(bypass_suspicious_login.__name__, "send_security_code_button")
     )
     (ActionChains(browser).move_to_element(send_security_code_button).click().perform())
 
@@ -105,8 +111,8 @@ def bypass_suspicious_login(
     if security_code is None:
         security_code = input("Type the security code here: ")
 
-    security_code_field = browser.find_element(
-        By.XPATH, read_xpath(bypass_suspicious_login.__name__, "security_code_field")
+    security_code_field = browser.find_element_by_xpath(
+        read_xpath(bypass_suspicious_login.__name__, "security_code_field")
     )
 
     (
@@ -121,9 +127,8 @@ def bypass_suspicious_login(
     for _ in range(2):
         update_activity(browser, state=None)
 
-    submit_security_code_button = browser.find_element(
-        By.XPATH,
-        read_xpath(bypass_suspicious_login.__name__, "submit_security_code_button"),
+    submit_security_code_button = browser.find_element_by_xpath(
+        read_xpath(bypass_suspicious_login.__name__, "submit_security_code_button")
     )
 
     (
@@ -139,8 +144,8 @@ def bypass_suspicious_login(
     try:
         sleep(3)
         # locate wrong security code message
-        wrong_login = browser.find_element(
-            By.XPATH, read_xpath(bypass_suspicious_login.__name__, "wrong_login")
+        wrong_login = browser.find_element_by_xpath(
+            read_xpath(bypass_suspicious_login.__name__, "wrong_login")
         )
 
         if wrong_login is not None:
@@ -172,8 +177,8 @@ def check_browser(browser, logfolder, logger, proxy_address):
     # check connection status
     try:
         logger.info("-- Connection Checklist [1/2] (Internet Connection Status)")
-        browser.get("view-source:https://freegeoip.app/json")
-        pre = browser.find_element(By.TAG_NAME, "pre").text
+        browser.get("view-source:https://ip4.seeip.org/geoip")
+        pre = browser.find_element_by_tag_name("pre").text
         current_ip_info = json.loads(pre)
         if (
             proxy_address is not None
@@ -193,7 +198,7 @@ def check_browser(browser, logfolder, logger, proxy_address):
             logger.info(
                 '- Current IP is "{}" and it\'s from "{}/{}"'.format(
                     current_ip_info["ip"],
-                    current_ip_info["country_name"],
+                    current_ip_info["country"],
                     current_ip_info["country_code"],
                 )
             )
@@ -252,6 +257,15 @@ def login_user(
     ig_homepage = "https://www.instagram.com"
     web_address_navigator(browser, ig_homepage)
 
+    for element in browser.find_elements_by_tag_name('button'):
+        logger.info("find the button")
+        if element.text.strip().lower() == 'allow essential and optional cookies':
+            logger.info("Clicking accept all cookies button ...")
+            element.click()
+            logger.info("Sleeping 4 seconds ...")
+            sleep(4)
+            break
+
     cookie_file = "{0}{1}_cookie.pkl".format(logfolder, username)
     cookie_loaded = None
     login_state = None
@@ -283,7 +297,7 @@ def login_user(
         sleep(4)
 
     except (WebDriverException, OSError, IOError):
-        # Just info the user, not an error
+        # Just infor the user, not an error
         logger.info("- Cookie file not found, creating cookie...")
 
     if login_state and cookie_loaded:
@@ -307,7 +321,7 @@ def login_user(
         # type="button"> Cookie could not be loaded" or similar.
         # Session displayed we are in, but then a failure for the first
         # `login_elem` like the element is no longer attached to the DOM.
-        # Saw this issue when session hasn't been used for a while; which means
+        # Saw this issue when session hasn't been used for a while; wich means
         # "expiry" values in cookie are outdated.
         try:
             # Since having issues with the cookie a new one can be generated,
@@ -334,22 +348,20 @@ def login_user(
 
     # Check if the first div is 'Create an Account' or 'Log In'
     try:
-        login_elem = browser.find_element(
-            By.XPATH, read_xpath(login_user.__name__, "login_elem")
+        login_elem = browser.find_element_by_xpath(
+            read_xpath(login_user.__name__, "login_elem")
         )
     except NoSuchElementException:
         logger.warning("Login A/B test detected! Trying another string...")
         try:
-            login_elem = browser.find_element(
-                By.XPATH,
-                read_xpath(login_user.__name__, "login_elem_no_such_exception"),
+            login_elem = browser.find_element_by_xpath(
+                read_xpath(login_user.__name__, "login_elem_no_such_exception")
             )
         except NoSuchElementException:
             logger.warning("Could not pass the login A/B test. Trying last string...")
             try:
-                login_elem = browser.find_element(
-                    By.XPATH,
-                    read_xpath(login_user.__name__, "login_elem_no_such_exception_2"),
+                login_elem = browser.find_element_by_xpath(
+                    read_xpath(login_user.__name__, "login_elem_no_such_exception_2")
                 )
             except NoSuchElementException as e:
                 # NF: start
@@ -382,7 +394,7 @@ def login_user(
     explicit_wait(browser, "VOEL", [input_username_XP, "XPath"], logger)
 
     # user
-    input_username = browser.find_element(By.XPATH, input_username_XP)
+    input_username = browser.find_element_by_xpath(input_username_XP)
 
     (
         ActionChains(browser)
@@ -399,8 +411,8 @@ def login_user(
     sleep(1)
 
     # password
-    input_password = browser.find_element(
-        By.XPATH, read_xpath(login_user.__name__, "input_password")
+    input_password = browser.find_elements_by_xpath(
+        read_xpath(login_user.__name__, "input_password")
     )
 
     if not isinstance(password, str):
@@ -408,7 +420,7 @@ def login_user(
 
     (
         ActionChains(browser)
-        .move_to_element(input_password)
+        .move_to_element(input_password[0])
         .click()
         .send_keys(password)
         .perform()
@@ -418,7 +430,7 @@ def login_user(
 
     (
         ActionChains(browser)
-        .move_to_element(input_password)
+        .move_to_element(input_password[0])
         .click()
         .send_keys(Keys.ENTER)
         .perform()
@@ -446,8 +458,8 @@ def login_user(
         # check if account is disabled by Instagram,
         # or there is an active challenge to solve
         try:
-            account_disabled = browser.find_element(
-                By.XPATH, read_xpath(login_user.__name__, "account_disabled")
+            account_disabled = browser.find_element_by_xpath(
+                read_xpath(login_user.__name__, "account_disabled")
             )
             logger.warning(account_disabled.text)
             update_activity(
@@ -463,8 +475,8 @@ def login_user(
 
         # in case the user doesnt have a phone number linked to the Instagram account
         try:
-            browser.find_element(
-                By.XPATH, read_xpath(login_user.__name__, "add_phone_number")
+            browser.find_element_by_xpath(
+                read_xpath(login_user.__name__, "add_phone_number")
             )
             challenge_warn_msg = (
                 "Instagram initiated a challenge before allow your account to login. "
@@ -485,8 +497,8 @@ def login_user(
 
         # try to initiate security code challenge
         try:
-            browser.find_element(
-                By.XPATH, read_xpath(login_user.__name__, "suspicious_login_attempt")
+            browser.find_element_by_xpath(
+                read_xpath(login_user.__name__, "suspicious_login_attempt")
             )
             update_activity(
                 browser,
@@ -501,8 +513,8 @@ def login_user(
 
     # check for wrong username or password message, and show it to the user
     try:
-        error_alert = browser.find_element(
-            By.XPATH, read_xpath(login_user.__name__, "error_alert")
+        error_alert = browser.find_element_by_xpath(
+            read_xpath(login_user.__name__, "error_alert")
         )
         logger.warning(error_alert.text)
         update_activity(
@@ -523,8 +535,8 @@ def login_user(
     explicit_wait(browser, "PFL", [], logger, 5)
 
     # Check if user is logged-in (If there's two 'nav' elements)
-    nav = browser.find_element(By.XPATH, read_xpath(login_user.__name__, "nav"))
-    if nav is not None:
+    nav = browser.find_elements_by_xpath(read_xpath(login_user.__name__, "nav"))
+    if len(nav) == 2:
         # create cookie for username and save it
         cookies_list = browser.get_cookies()
 
@@ -559,7 +571,7 @@ def dismiss_get_app_offer(browser, logger):
     )
 
     if offer_loaded:
-        dismiss_elem = browser.find_element(By.XPATH, dismiss_elem)
+        dismiss_elem = browser.find_element_by_xpath(dismiss_elem)
         click_element(browser, dismiss_elem)
 
 
@@ -576,7 +588,7 @@ def dismiss_notification_offer(browser, logger):
     )
 
     if offer_loaded:
-        dismiss_elem = browser.find_element(By.XPATH, dismiss_elem_loc)
+        dismiss_elem = browser.find_element_by_xpath(dismiss_elem_loc)
         click_element(browser, dismiss_elem)
 
 
@@ -595,15 +607,15 @@ def dismiss_save_information(browser, logger):
         # contributes or stimulate IG to target the acct, it would be better to
         # just pretend that we are using IG in different browsers.
         logger.info("- Do not save Login Info by now...")
-        dismiss_elem = browser.find_element(By.XPATH, dismiss_elem_loc)
+        dismiss_elem = browser.find_element_by_xpath(dismiss_elem_loc)
         click_element(browser, dismiss_elem)
 
 
 def dismiss_this_was_me(browser):
     try:
         # click on "This was me" button if challenge page was called
-        this_was_me_button = browser.find_element(
-            By.XPATH, read_xpath(dismiss_this_was_me.__name__, "this_was_me_button")
+        this_was_me_button = browser.find_element_by_xpath(
+            read_xpath(dismiss_this_was_me.__name__, "this_was_me_button")
         )
         (ActionChains(browser).move_to_element(this_was_me_button).click().perform())
         # update server calls
@@ -643,11 +655,11 @@ def two_factor_authentication(browser, logger, security_codes):
             verification_code = read_xpath(login_user.__name__, "verification_code")
             explicit_wait(browser, "VOEL", [verification_code, "XPath"], logger)
 
-            security_code = browser.find_element(By.XPATH, verification_code)
+            security_code = browser.find_element_by_xpath(verification_code)
 
             #  Confirm blue button
-            confirm = browser.find_element(
-                By.XPATH, read_xpath(login_user.__name__, "confirm")
+            confirm = browser.find_elements_by_xpath(
+                read_xpath(login_user.__name__, "confirm")
             )
 
             (
@@ -662,7 +674,7 @@ def two_factor_authentication(browser, logger, security_codes):
 
             (
                 ActionChains(browser)
-                .move_to_element(confirm)
+                .move_to_element(confirm[0])
                 .click()
                 .send_keys(Keys.ENTER)
                 .perform()
@@ -702,5 +714,5 @@ def accept_igcookie_dialogue(browser, logger):
 
     if offer_loaded:
         logger.info("- Accepted IG cookies by default...")
-        accept_elem = browser.find_element(By.XPATH, offer_elem_loc)
+        accept_elem = browser.find_element_by_xpath(offer_elem_loc)
         click_element(browser, accept_elem)

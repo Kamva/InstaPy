@@ -1012,6 +1012,19 @@ def scroll_bottom(browser, element, range_int):
 
     return
 
+def scroll_top(browser, element, range_int):
+    # put a limit to the scrolling
+    if range_int > 50:
+        range_int = 50
+
+    for _ in range(int(range_int / 2)):
+        # scroll up the page by 1000 pixels every time
+        browser.execute_script("window.scrollBy(0, -1000)")
+        # update server calls
+        update_activity(browser, state=None)
+        sleep(1)
+
+    return
 
 def scroll_down(browser, y: int = 50):
     """
@@ -2054,6 +2067,22 @@ def click_visibly(browser, element):
         sleep(randint(1, 5))
 
         click_element(browser, element)
+
+    return True
+
+def click_visible(browser, element):
+    """Click as the element become visible"""
+    browser.execute_script(
+        "arguments[0].scrollIntoView(false);"
+        "arguments[0].scrollIntoView(true);"
+        "arguments[0].setAttribute('style', 'background:red')",
+        element,
+    )
+    # update server calls
+    update_activity(browser, state=None)
+    sleep(randint(1, 5))
+
+    # click_element(browser, element)
 
     return True
 
